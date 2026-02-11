@@ -5,7 +5,7 @@ A modern book exchange platform that connects readers and gives pre-loved books 
 ## 👥 Collaborators
 
 - **Muhammad Umer**
-- **Saad Tariq**
+- **Kaleemullah Younas**
 
 ## 🛠️ Technologies Used
 
@@ -150,7 +150,3 @@ For every book, estimates:
    ```bash
    npm run dev
    ```
-
-## 📄 License
-
-This project was built for TechVerse Hackathon 2026.
