@@ -1,0 +1,389 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @map("_id")
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  points        Int      @default(1000) // Starting bonus points for new users
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions         Session[]
+  accounts         Account[]
+  books            Book[]
+  transactions     PointTransaction[]
+  sentRequests     BookRequest[]      @relation("RequestSender")
+  receivedRequests BookRequest[]      @relation("RequestReceiver")
+  exchangePoints   ExchangePoint[]
+}
+
+model Session {
+  id        String   @id @map("_id")
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @map("_id")
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id @map("_id")
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Book Exchange Models
+model Book {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  digitalId     String         @unique @default(uuid()) // Unique digital identity for each book
+  title         String
+  author        String
+  description   String?
+  condition     BookCondition
+  images        String[] // Array of image URLs
+  location      String
+  latitude      Float?
+  longitude     Float?
+  isAvailable   Boolean        @default(true)
+  pointValue    Int? // Calculated point value for the book
+  ownerId       String
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  requests      BookRequest[]
+  conversations Conversation[]
+
+  @@index([ownerId])
+  @@index([isAvailable])
+  @@index([condition])
+}
+
+enum BookCondition {
+  NEW
+  LIKE_NEW
+  VERY_GOOD
+  GOOD
+  ACCEPTABLE
+}
+
+// Point Transaction System
+model PointTransaction {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int // Positive for earned, negative for spent
+  type        TransactionType
+  description String
+  bookId      String?         @db.ObjectId
+  createdAt   DateTime        @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  EARNED_LISTING // Points earned by listing a book
+  EARNED_EXCHANGE // Points earned by giving away a book
+  SPENT_REQUEST // Points spent to request a book
+  REFUND // Points refunded (cancelled request)
+  BONUS // Welcome bonus or promotional points
+}
+
+// Book Request/Exchange System
+model BookRequest {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  bookId        String        @db.ObjectId
+  book          Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  requesterId   String
+  requester     User          @relation("RequestSender", fields: [requesterId], references: [id], onDelete: Cascade)
+  ownerId       String
+  owner         User          @relation("RequestReceiver", fields: [ownerId], references: [id], onDelete: Cascade)
+  pointsOffered Int // Points the requester is willing to spend
+  status        RequestStatus @default(PENDING)
+  message       String? // Optional message from requester
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([bookId])
+  @@index([requesterId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+enum RequestStatus {
+  PENDING // Waiting for owner response
+  ACCEPTED // Owner accepted, exchange in progress
+  COMPLETED // Exchange completed successfully
+  DECLINED // Owner declined the request
+  CANCELLED // Requester cancelled
+}
+
+// ============================================
+// BOOK FORUMS & COMMUNITY DISCUSSIONS
+// ============================================
+
+// Forum Discussion (Thread)
+model ForumDiscussion {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  content     String
+  category    ForumCategory
+  bookTitle   String? // Optional: specific book being discussed
+  bookAuthor  String? // Optional: author of the book
+  chapter     String? // Optional: specific chapter being discussed
+  authorId    String
+  authorName  String // Store display name (can be anonymous)
+  isAnonymous Boolean         @default(false)
+  isPinned    Boolean         @default(false)
+  isLocked    Boolean         @default(false)
+  viewCount   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  replies     ForumReply[]
+  reports     ForumReport[]
+  reactions   ForumReaction[]
+
+  @@index([category])
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([bookTitle])
+}
+
+// Forum Reply (Comments on discussions)
+model ForumReply {
+  id           String          @id @default(auto()) @map("_id") @db.ObjectId
+  content      String
+  discussionId String          @db.ObjectId
+  discussion   ForumDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  authorId     String
+  authorName   String // Store display name (can be anonymous)
+  isAnonymous  Boolean         @default(false)
+  parentId     String?         @db.ObjectId // For nested replies
+  isEdited     Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  reports      ForumReport[]
+  reactions    ForumReaction[]
+
+  @@index([discussionId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([createdAt])
+}
+
+// Forum Reactions (likes, helpful, etc.)
+model ForumReaction {
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  type         ReactionType
+  userId       String
+  discussionId String?          @db.ObjectId
+  discussion   ForumDiscussion? @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  replyId      String?          @db.ObjectId
+  reply        ForumReply?      @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@unique([userId, discussionId, type])
+  @@unique([userId, replyId, type])
+  @@index([discussionId])
+  @@index([replyId])
+  @@index([userId])
+}
+
+// Forum Reports (abuse detection)
+model ForumReport {
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  reason       ReportReason
+  description  String?
+  reporterId   String
+  discussionId String?          @db.ObjectId
+  discussion   ForumDiscussion? @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  replyId      String?          @db.ObjectId
+  reply        ForumReply?      @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  status       ReportStatus     @default(PENDING)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([discussionId])
+  @@index([replyId])
+  @@index([reporterId])
+  @@index([status])
+}
+
+// Enums for Forums
+enum ForumCategory {
+  READER_DISCUSSIONS // General reader discussions
+  CHAPTER_DEBATES // Chapter-wise debates
+  INTERPRETATIONS // Interpretations and opinions
+  READING_GUIDANCE // Reading guidance and insights
+  BOOK_REVIEWS // Book reviews
+  RECOMMENDATIONS // Book recommendations
+  GENERAL // General discussions
+}
+
+enum ReactionType {
+  LIKE
+  HELPFUL
+  INSIGHTFUL
+  AGREE
+  DISAGREE
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  HATE_SPEECH
+  INAPPROPRIATE
+  MISINFORMATION
+  OFF_TOPIC
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTION_TAKEN
+  DISMISSED
+}
+
+// ============================================
+// DIRECT MESSAGING / CHAT
+// ============================================
+
+// Chat Conversation (between two users about a book)
+model Conversation {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  bookId        String    @db.ObjectId
+  book          Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  participant1  String // User ID (the person who initiated)
+  participant2  String // User ID (book owner)
+  lastMessage   String?
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+
+  @@unique([bookId, participant1, participant2])
+  @@index([participant1])
+  @@index([participant2])
+  @@index([lastMessageAt])
+}
+
+// Chat Message
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  content        String
+  senderId       String
+  conversationId String       @db.ObjectId
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+// ============================================
+// EXCHANGE POINTS (STALLS)
+// ============================================
+
+model ExchangePoint {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  location    String // Human readable address
+  latitude    Float
+  longitude   Float
+  images      String[]
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  contactMethod String? // e.g. "EMAIL", "PHONE", "CHAT"
+  contactValue  String? // e.g. actual email or phone number
+
+  status ExchangePointStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+enum ExchangePointStatus {
+  ACTIVE
+  INACTIVE
+  VERIFIED
+}
+
+// ============================================
+// BOOK HISTORY (QR Code Based Journey)
+// ============================================
+
+// Book Reading History Entry - Preserves history even if user is deleted
+model BookHistoryEntry {
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  bookDigitalId String // Reference to Book.digitalId (not foreign key to preserve history)
+
+  // Reader information (stored separately to preserve if user deleted)
+  readerId     String? // User ID (nullable if user deleted)
+  readerName   String // Store display name at time of entry
+  readerAvatar String? // Store avatar URL at time of entry
+
+  // Reading details
+  city    String // City where book was read
+  country String? // Country (optional)
+
+  // Reading duration
+  startDate    DateTime // When they started reading
+  endDate      DateTime? // When they finished (optional if still reading)
+  durationDays Int? // Calculated reading duration in days
+
+  // Notes and tips for next readers
+  note   String? // Short note or review (max 500 chars)
+  tip    String? // Tip for next readers (max 300 chars)
+  rating Int? // Optional rating 1-5
+
+  // Entry metadata
+  isAnonymous Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([bookDigitalId])
+  @@index([readerId])
+  @@index([createdAt])
+}
