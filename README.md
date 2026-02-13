@@ -1,156 +1,348 @@
 # 📚 BookExchange
 
-A modern book exchange platform that connects readers and gives pre-loved books a second life. Built with AI-powered features for an enhanced user experience.
+A full-stack book exchange platform where readers list, discover, and trade books using a point-based economy — powered by AI valuation, real-time chat, community forums, and interactive map-based exchange stalls.
 
-## 👥 Collaborators
+Built with **Next.js 16**, **React 19**, **TypeScript**, **tRPC**, **Prisma + MongoDB**, and **Google Gemini AI**.
 
-- **Muhammad Umer**
-- **Saad Tariq**
+---
 
-## 🛠️ Technologies Used
+## What It Does
 
-### Frontend
+BookExchange replaces the typical buy/sell model with a **point-based exchange system**. Every user starts with 1,000 points. Listing a book earns you points, requesting a book costs points. The point value of each book is calculated by an AI model that factors in condition, demand (pending requests), and rarity (copies in the system).
 
-- **Next.js 15** - React framework with App Router
-- **React 19** - UI library
-- **TypeScript** - Type-safe JavaScript
-- **Tailwind CSS v4** - Utility-first CSS framework
-- **Lucide React** - Icon library
+Beyond the exchange, there's a forum for reader discussions, a real-time chat system for negotiating trades, a map of physical exchange stalls, and an AI chatbot (BookBot) that helps users discover books.
 
-### Backend
+---
 
-- **tRPC** - End-to-end typesafe APIs
-- **Prisma** - Database ORM
-- **MongoDB** - NoSQL database
-- **Better Auth** - Authentication library
+## Architecture
 
-### AI & APIs
+```mermaid
+graph TB
+    subgraph Client["Client Layer"]
+        direction TB
+        UI["Next.js 16 App Router<br/>React 19 · TypeScript · Tailwind v4"]
+        ANIM["Framer Motion · GSAP<br/>Lucide Icons · Leaflet Maps"]
+        STATE["TanStack React Query<br/>tRPC Client · Pusher JS"]
+        UI --> ANIM
+        UI --> STATE
+    end
 
-- **Google Gemini AI** - Powers all AI features (book valuation, recommendations, chat assistant, reading insights, time estimation)
-- **Stripe** - Payment processing for purchasing points
-- **Pusher** - Real-time notifications and chat
-- **Cloudinary** - File/image uploads
+    subgraph Server["Server Layer"]
+        direction TB
+        API["Next.js API Routes"]
+        TRPC["tRPC Routers"]
+        MW["Middleware<br/>Auth Guard · Email Verification"]
+        API --> TRPC
+        API --> MW
+        subgraph Routers["Router Modules"]
+            R1["book"]
+            R2["exchange"]
+            R3["forum"]
+            R4["chat"]
+            R5["bookBot"]
+            R6["bookHistory"]
+            R7["readingInsights"]
+        end
+        TRPC --> Routers
+    end
 
-### Other Tools
+    subgraph External["External Services"]
+        direction TB
+        DB[("MongoDB<br/>Prisma ORM")]
+        AI["Google Gemini AI"]
+        STRIPE["Stripe Payments"]
+        PUSH["Pusher WebSockets"]
+        CLOUD["Cloudinary CDN"]
+        EMAIL["Brevo SMTP"]
+        OAUTH["Google & GitHub OAuth"]
+    end
 
-- **QRCode.react** - QR code generation for book tracking
-- **Leaflet** - Interactive maps for exchange points
-- **Zod** - Schema validation
+    subgraph Data["Data Models"]
+        direction LR
+        M1["User"] --- M2["Book"] --- M3["BookRequest"]
+        M4["PointTransaction"] --- M5["Conversation"] --- M6["Message"]
+        M7["ForumDiscussion"] --- M8["ForumReply"] --- M9["ExchangePoint"]
+        M10["BookHistoryEntry"]
+    end
 
-## ✨ Features
+    Client -->|tRPC| Server
+    Client -->|WebSocket| PUSH
+    Server --> DB
+    Server --> AI
+    Server --> STRIPE
+    Server --> PUSH
+    Server --> CLOUD
+    Server --> EMAIL
+    MW --> OAUTH
+    DB --> Data
+```
 
-### 📖 Book Exchange System
+| Layer | Stack | Role |
+|-------|-------|------|
+| Frontend | Next.js 16, React 19, Tailwind v4 | SSR/CSR hybrid, responsive UI |
+| Animations | Framer Motion, GSAP | Transitions, micro-interactions |
+| Data Fetching | tRPC + TanStack Query | End-to-end typesafe API with caching |
+| Auth | Better Auth (email + Google + GitHub) | Session management, email verification |
+| Database | MongoDB + Prisma ORM | Document store, 12 models, indexed queries |
+| AI | Google Gemini | Book valuation, recommendations, chatbot, insights |
+| Payments | Stripe Checkout | Buy points via card |
+| Real-time | Pusher | Live chat, notifications |
+| Media | Cloudinary | Image upload and CDN |
+| Email | Brevo SMTP via Nodemailer | Verification and password reset emails |
+| Maps | Leaflet + React-Leaflet | Exchange stall geolocation |
 
-- List books with multiple images and detailed condition ratings
-- Unique digital ID for every book ensuring authenticity
-- Location-based book discovery
-- Points-based exchange system
+---
 
-### 🤖 AI-Powered Features
+## Features
 
-#### 1. AI Book Valuation
+### Book Exchange & Points Economy
+- List books with condition grading (New → Acceptable), images, and location
+- AI-driven book valuation using Gemini — factors in condition, supply, and demand
+- Request books from other users by spending points
+- Accept/decline/cancel requests with automatic point transfers
+- Transaction history with full audit trail
+- Buy additional points through Stripe checkout
 
-Automatically calculates fair point values for books based on:
+### AI-Powered (Gemini)
+- **Book Valuation** — dynamic point pricing based on condition, rarity, and demand
+- **Personalized Recommendations** — analyzes your owned books, requests, and reading history to suggest matches
+- **BookBot** — floating AI chatbot that helps discover books, answers platform questions, and suggests exchanges
+- **Reading Insights** — generates personality-type analysis, favorite genres, reading pace, and fun facts from your history
+- **Reading Time Estimation** — predicts reading duration based on book title, author, and description
 
-- Book condition
-- Rarity in the system
-- Demand from other users
+### Community Forums
+- Category-based discussions: Reader Discussions, Chapter Debates, Interpretations, Book Reviews, Recommendations
+- Threaded replies with nested comments
+- Reaction system (Like, Helpful, Insightful, Agree, Disagree)
+- Abuse reporting with moderation workflow
+- Anonymous posting support
+- Profanity filtering via `bad-words`
 
-#### 2. AI Book Recommendations
+### Real-Time Chat
+- Direct messaging between users about specific books
+- Pusher-powered live message delivery
+- Unread message counts
+- Conversation history with pagination
 
-Personalized book suggestions based on:
+### Exchange Points (Stalls)
+- Register physical exchange locations on an interactive Leaflet map
+- Each stall has name, description, images, contact info, and coordinates
+- Browse nearby exchange stalls geographically
+- Active/Inactive/Verified status system
 
-- Books you own
-- Books you've requested
-- Your reading history
+### Book History & QR Journey
+- Every book gets a unique digital ID
+- Track a book's journey across readers and cities
+- Readers log their reading duration, city, optional notes, tips, and ratings
+- History is preserved even if users are deleted
+- Anonymous entries supported
 
-#### 3. AI BookBot Chat Assistant
+### Auth & User Management
+- Email/password sign-up with email verification
+- Google and GitHub OAuth
+- Password reset via email
+- Middleware-enforced route protection
+- Theme toggle (light/dark/system)
 
-Interactive chatbot that helps users:
+---
 
-- Discover new books
-- Navigate the platform
-- Get book recommendations
-- Answer questions about exchanges
+## Project Structure
 
-#### 4. AI Reading Insights
+```
+bookexchange-beta/
+├── prisma/
+│   └── schema.prisma            # 12 models, MongoDB datasource
+├── public/
+│   └── images/                  # Static assets
+├── scripts/
+│   ├── test-create-point.js     # Exchange point seeding
+│   └── verify-prisma.js         # DB connection test
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── auth/            # Better Auth handler
+│   │   │   ├── exchange-points/ # REST endpoints for stalls
+│   │   │   ├── stripe/          # Checkout + webhook
+│   │   │   ├── trpc/            # tRPC HTTP handler
+│   │   │   └── upload/          # Cloudinary upload
+│   │   ├── books/               # Browse & detail pages
+│   │   ├── book-history/        # QR journey viewer
+│   │   ├── chat/                # Real-time messaging
+│   │   ├── exchange-points/     # Map + stall management
+│   │   ├── forums/              # Discussion threads
+│   │   ├── requests/            # Incoming/outgoing requests
+│   │   ├── settings/            # User settings
+│   │   ├── wallet/              # Points balance + buy
+│   │   ├── signin/              # Auth pages
+│   │   ├── signup/
+│   │   ├── verify-email/
+│   │   ├── forgot-password/
+│   │   ├── reset-password/
+│   │   ├── layout.tsx           # Root layout (Header + BookBot)
+│   │   └── page.tsx             # Landing page
+│   ├── components/
+│   │   ├── books/               # BookCard, BookGrid, AddBookForm, QRCode, AIRecommendations
+│   │   ├── exchange/            # Map, RequestBookModal, PointsDisplay, TransactionHistory
+│   │   ├── forum/               # DiscussionCard, ReplyCard, CreateDiscussionModal
+│   │   ├── BookBot.tsx          # Floating AI chatbot
+│   │   ├── Header.tsx           # Navigation
+│   │   ├── NotificationDropdown.tsx
+│   │   ├── ReadingInsights.tsx
+│   │   └── ThemeToggle.tsx
+│   ├── lib/
+│   │   ├── auth.ts              # Better Auth config
+│   │   ├── auth-client.ts       # Client-side auth
+│   │   ├── db.ts                # Prisma client
+│   │   ├── email-service.ts     # Nodemailer + Brevo
+│   │   ├── gemini.ts            # All 5 AI features
+│   │   ├── pusher.ts            # Server-side Pusher
+│   │   ├── pusher-client.ts     # Client-side Pusher + notifications
+│   │   ├── stripe.ts            # Stripe config
+│   │   └── trpc.ts              # tRPC client hooks
+│   ├── server/
+│   │   ├── trpc.ts              # tRPC context + procedures
+│   │   └── routers/
+│   │       ├── _app.ts          # Root router
+│   │       ├── book.ts          # CRUD, recommendations, reading time
+│   │       ├── exchange.ts      # Requests, valuations, point transfers
+│   │       ├── forum.ts         # Discussions, replies, reactions, reports
+│   │       ├── chat.ts          # Conversations + real-time messaging
+│   │       ├── bookBot.ts       # AI chatbot endpoint
+│   │       ├── bookHistory.ts   # Digital journey tracking
+│   │       └── readingInsights.ts
+│   └── middleware.ts            # Auth guard + email verification
+├── Dockerfile                   # Production container
+├── package.json
+└── tsconfig.json
+```
 
-Analyzes your reading history to provide:
+---
 
-- Personalized reading summary
-- Favorite genres detection
-- Reading pace analysis
-- Geographic diversity stats
-- Reader personality type
-- Fun facts about your reading journey
+## Getting Started
 
-#### 5. AI Reading Time Estimator
+### Prerequisites
 
-For every book, estimates:
+- Node.js 22+
+- MongoDB instance (Atlas or local)
+- Accounts/keys for: Google Cloud (Gemini + OAuth), GitHub OAuth, Stripe, Pusher, Cloudinary, Brevo
 
-- Total reading time (hours/minutes)
-- Page count
-- Difficulty level
-- Days to complete (at 2 hrs/day)
-- Personalized pace description
+### Setup
 
-### 📱 QR Code Book History
-
-- Every book gets a unique QR code
-- Scan to see the book's journey
-- Track cities and countries visited
-- Read notes and tips from previous readers
-- Add your own reading experience
-
-### 💰 Points & Wallet System
-
-- Earn points by listing books
-- Spend points to request books
-- Purchase additional points via Stripe
-- Transaction history tracking
-
-### 🗺️ Exchange Points
-
-- Physical locations for book exchanges
-- Interactive map with Leaflet
-- Create and manage exchange points
-
-### 💬 Forums & Community
-
-- Discussion forums for book lovers
-- Category-based organization
-- Reply and engage with other readers
-
-### 🔔 Real-time Features
-
-- Live notifications via Pusher
-- Chat functionality
-- Instant updates on exchange requests
-
-### 🎨 User Experience
-
-- Dark/Light theme support
-- Responsive design for all devices
-- Modern, clean UI with gold accent theme
-- Smooth animations and transitions
-
-## 🚀 Getting Started
-
-1. Clone the repository
-2. Install dependencies:
+1. **Clone and install**
    ```bash
+   git clone https://github.com/umerkang66/bookexchange-beta.git
+   cd bookexchange-beta
    npm install
    ```
-3. Set up environment variables (`.env`)
-4. Run database migrations:
-   ```bash
-   npx prisma db push
+
+2. **Configure environment**
+
+   Copy `.env.example` to `.env` and fill in:
+   ```env
+   DATABASE_URL="mongodb+srv://..."
+   BETTER_AUTH_SECRET="your-secret-key-min-32-chars-long"
+   BETTER_AUTH_URL="http://localhost:3000"
+   NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+   # OAuth
+   GOOGLE_CLIENT_ID=""
+   GOOGLE_CLIENT_SECRET=""
+   GITHUB_CLIENT_ID=""
+   GITHUB_CLIENT_SECRET=""
+
+   # Services
+   GEMINI_API_KEY=""
+   BREVO_USER=""
+   BREVO_PASS=""
+   NEXT_PUBLIC_PUSHER_KEY=""
+   NEXT_PUBLIC_PUSHER_CLUSTER=""
+   PUSHER_APP_ID=""
+   PUSHER_SECRET=""
+   CLOUDINARY_NAME=""
+   CLOUDINARY_API_KEY=""
+   CLOUDINARY_API_SECRET=""
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=""
+   STRIPE_SECRET_KEY=""
+   STRIPE_WEBHOOK_SECRET=""
    ```
-5. Start the development server:
+
+3. **Generate Prisma client**
+   ```bash
+   npx prisma generate
+   ```
+
+4. **Run dev server**
    ```bash
    npm run dev
    ```
+   Open [http://localhost:3000](http://localhost:3000).
 
-## 📄 License
+### Stripe Webhooks (Local)
 
-This project was built for TechVerse Hackathon 2026.
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+### Docker
+
+```bash
+docker build -t bookexchange .
+docker run -p 3000:3000 --env-file .env bookexchange
+```
+
+---
+
+## Database Schema
+
+12 models across 4 domains:
+
+**Users & Auth** — `User`, `Session`, `Account`, `Verification`
+
+**Book Exchange** — `Book` (with digital ID, condition, location, AI-calculated point value), `BookRequest` (status workflow: Pending → Accepted → Completed), `PointTransaction` (earned/spent/refunded/bonus)
+
+**Community** — `ForumDiscussion`, `ForumReply`, `ForumReaction`, `ForumReport`
+
+**Messaging** — `Conversation` (scoped to a book + two participants), `Message`
+
+**Physical** — `ExchangePoint` (stalls with geolocation)
+
+**History** — `BookHistoryEntry` (reader journey with city, duration, notes — preserved on user deletion)
+
+---
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npx prisma generate` | Regenerate Prisma client |
+| `npx prisma db push` | Push schema to database |
+
+---
+
+## Tech Stack Summary
+
+| Category | Technologies |
+|----------|-------------|
+| Framework | Next.js 16, React 19, TypeScript |
+| Styling | TailwindCSS v4, Framer Motion, GSAP |
+| API | tRPC v11, Zod validation |
+| Database | MongoDB, Prisma v6 |
+| Auth | Better Auth, Google OAuth, GitHub OAuth |
+| AI | Google Gemini (Generative AI SDK) |
+| Payments | Stripe (Checkout Sessions + Webhooks) |
+| Real-time | Pusher (WebSockets) |
+| Media | Cloudinary |
+| Email | Nodemailer + Brevo SMTP |
+| Maps | Leaflet, React-Leaflet |
+| Icons | Lucide React |
+| Deployment | Docker, Next.js Standalone |
+
+---
+
+## License
+
+This project is private and not currently licensed for public distribution.
